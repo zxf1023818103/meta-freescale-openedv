@@ -1,0 +1,56 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 8a1e223422..35b3386a44 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2307,7 +2307,7 @@ source "board/vscom/baltos/Kconfig"
+ source "board/phytium/durian/Kconfig"
+ source "board/phytium/pomelo/Kconfig"
+ source "board/xen/xenguest_arm64/Kconfig"
+-
++source "board/openedv/openedv-imx6ull-evk/Kconfig"
+ source "arch/arm/Kconfig.debug"
+ 
+ endmenu
+diff --git a/arch/arm/mach-imx/mx6/Kconfig b/arch/arm/mach-imx/mx6/Kconfig
+index 7529b311f8..72e4394e90 100644
+--- a/arch/arm/mach-imx/mx6/Kconfig
++++ b/arch/arm/mach-imx/mx6/Kconfig
+@@ -482,6 +482,15 @@ config TARGET_MYS_6ULX
+ 	select DM_THERMAL
+ 	select SUPPORT_SPL
+ 
++config TARGET_OPENEDV_IMX6ULL_EVK
++        bool "OpenEDV i.MX6ULL Board"
++        depends on MX6ULL
++        select BOARD_LATE_INIT
++        select DM
++        select DM_THERMAL
++        select IOMUX_LPSR
++        imply CMD_DM
++
+ config TARGET_NITROGEN6X
+ 	bool "nitrogen6x"
+ 	depends on MX6DL || MX6Q || MX6QDL || MX6S
+@@ -694,6 +703,7 @@ source "board/freescale/mx6sxsabresd/Kconfig"
+ source "board/freescale/mx6sxsabreauto/Kconfig"
+ source "board/freescale/mx6ul_14x14_evk/Kconfig"
+ source "board/freescale/mx6ullevk/Kconfig"
++source "board/openedv/openedv-imx6ull-evk/Kconfig"
+ source "board/bosch/acc/Kconfig"
+ source "board/grinn/liteboard/Kconfig"
+ source "board/phytec/pcm058/Kconfig"
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index 80230b907c..05978f5072 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -182,6 +182,10 @@ int genphy_config_aneg(struct phy_device *phydev)
+ {
+ 	int result;
+ 
++#ifdef CONFIG_PHY_SMSC
++	phy_reset(phydev);
++#endif
++
+ 	if (phydev->autoneg != AUTONEG_ENABLE)
+ 		return genphy_setup_forced(phydev);
+ 

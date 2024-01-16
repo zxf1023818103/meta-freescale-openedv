@@ -1,0 +1,95 @@
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index e7fbf02bdc69..6e602ae55aa7 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -3904,6 +3904,14 @@ fec_probe(struct platform_device *pdev)
+ 	char irq_name[8];
+ 	int irq_cnt;
+ 	struct fec_devinfo *dev_info;
++	void __iomem *IMX6U_ENET1_TX_CLK;
++	void __iomem *IMX6U_ENET2_TX_CLK;
++
++	IMX6U_ENET1_TX_CLK = ioremap(0X020E00DC, 4);
++	writel(0X14, IMX6U_ENET1_TX_CLK);
++	
++	IMX6U_ENET2_TX_CLK = ioremap(0X020E00FC, 4);
++	writel(0X14, IMX6U_ENET2_TX_CLK);
+ 
+ 	fec_enet_get_queue_num(pdev, &num_tx_qs, &num_rx_qs);
+ 
+diff --git a/drivers/net/phy/smsc.c b/drivers/net/phy/smsc.c
+index df2c5435c5c4..1e5800f65629 100644
+--- a/drivers/net/phy/smsc.c
++++ b/drivers/net/phy/smsc.c
+@@ -21,6 +21,8 @@
+ #include <linux/phy.h>
+ #include <linux/netdevice.h>
+ #include <linux/smscphy.h>
++#include <linux/of_gpio.h>
++#include <linux/io.h>
+ 
+ /* Vendor-specific PHY Definitions */
+ /* EDPD NLP / crossover time configuration */
+@@ -117,9 +119,44 @@ static int smsc_phy_config_init(struct phy_device *phydev)
+ 
+ static int smsc_phy_reset(struct phy_device *phydev)
+ {
+-	int rc = phy_read(phydev, MII_LAN83C185_SPECIAL_MODES);
+-	if (rc < 0)
++	int err, phy_reset;
++	int msec = 1;
++	struct device_node *np;
++	int timeout = 50000;
++	int rc;
++
++	if (phydev->mdio.addr == 0) {
++		np = of_find_node_by_path("/soc/bus@2100000/ethernet@2188000");
++	} else if (phydev->mdio.addr == 1) {
++		np = of_find_node_by_path("/soc/bus@2000000/ethernet@20b4000");
++	}
++
++	if (!np) {
++		printk("Could not find ethernet device tree node\n");
++		return -1;
++	}
++
++	/* A sane reset duration should not be longer than 1s */
++	err = of_property_read_u32(np, "phy-reset-duration", &msec);
++	if (!err && msec > 1000)
++		msec = 1;
++
++	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
++	if (!gpio_is_valid(phy_reset)) {
++		printk("Could not find phy-reset-gpios\n");
++		return -1;
++	}
++
++	gpio_direction_output(phy_reset, 0);
++	gpio_set_value(phy_reset, 0);
++	msleep(msec);
++	gpio_set_value(phy_reset, 1);
++
++	rc = phy_read(phydev, MII_LAN83C185_SPECIAL_MODES);
++	if (rc < 0) {
++		printk("phy_read error\n");
+ 		return rc;
++	}
+ 
+ 	/* If the SMSC PHY is in power down mode, then set it
+ 	 * in all capable mode before using it.
+@@ -130,6 +167,15 @@ static int smsc_phy_reset(struct phy_device *phydev)
+ 		phy_write(phydev, MII_LAN83C185_SPECIAL_MODES, rc);
+ 	}
+ 
++	phy_write(phydev, MII_BMCR, BMCR_RESET);
++	/* wait end of reset (max 500 ms) */
++	do {
++		udelay(10);
++		if (timeout-- == 0)
++			return -1;
++		rc = phy_read(phydev, MII_BMCR);
++	} while (rc & BMCR_RESET);
++
+ 	/* reset the phy */
+ 	return genphy_soft_reset(phydev);
+ }

@@ -1,0 +1,15 @@
+if TARGET_OPENEDV_IMX6ULL_EVK
+
+config SYS_BOARD
+	default "openedv-imx6ull-evk"
+
+config SYS_VENDOR
+	default "openedv"
+
+config SYS_CONFIG_NAME
+	default "openedv_imx6ull_evk"
+
+config IMX_CONFIG
+	default "board/openedv/openedv-imx6ull-evk/imximage.cfg"
+
+endif
